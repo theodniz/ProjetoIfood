@@ -1,32 +1,48 @@
 package projeto.ifood.pedido.modelo;
 
-import projeto.ifood.pedido.estado.*;
+import projeto.ifood.pedido.estado.EstadoPedido;
+import projeto.ifood.pedido.estado.EstadoPendente;
 import projeto.ifood.pedido.observador.ObservadorPedido;
+import projeto.ifood.pedido.builder.PedidoBuilder;
+import projeto.ifood.pedido.item.ItemCusto;
+import projeto.ifood.pedido.frete.CalculoFreteStrategy;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class Pedido {
+    // Atributos principais
     private String id;
+    private String clienteNome;
+    private String restauranteNome;
+    private String enderecoEntrega;
+    private List<ItemCusto> itens = new ArrayList<>();
+
+    // Atributos dos padrões
     private EstadoPedido estadoAtual;
     private List<ObservadorPedido> observadores = new ArrayList<>();
-    private String clienteNome; // Adicionado para identificação
-    private String restauranteNome; // Adicionado para identificação
+    private CalculoFreteStrategy estrategiaDeFrete;
 
-    public Pedido(String id, String clienteNome, String restauranteNome) {
-        this.id = id;
-        this.clienteNome = clienteNome;
-        this.restauranteNome = restauranteNome;
-        // Estado inicial do pedido é Pendente
-        this.estadoAtual = new EstadoPendente();
-        System.out.println("Pedido " + id + " criado para " + clienteNome + " no restaurante " + restauranteNome + ". Status inicial: " + estadoAtual.getNome());
+    // Construtor PRIVADO que só o Builder pode chamar
+    public Pedido(PedidoBuilder builder) {
+        this.id = builder.getId();
+        this.clienteNome = builder.getClienteNome();
+        this.restauranteNome = builder.getRestauranteNome();
+        this.enderecoEntrega = builder.getEnderecoEntrega();
+        this.itens.addAll(builder.getItens());
+        this.estadoAtual = new EstadoPendente(); // Define o estado inicial
+    }
+
+    // Ponto de entrada estático para o Builder
+    public static PedidoBuilder builder(String id) {
+        return new PedidoBuilder(id);
     }
 
     // Métodos do Padrão State
     public void setEstado(EstadoPedido novoEstado) {
         this.estadoAtual = novoEstado;
-        System.out.println("Pedido " + id + " mudou para o estado: " + estadoAtual.getNome());
-        notificarObservadores(); // Notifica os observadores sobre a mudança de estado
+        System.out.println("\n[LOG] Pedido " + id + " mudou para o estado: " + estadoAtual.getNome());
+        notificarObservadores();
     }
 
     public void avancarStatus() {
@@ -35,14 +51,6 @@ public class Pedido {
 
     public void cancelarPedido() {
         estadoAtual.cancelar(this);
-    }
-
-    public EstadoPedido getEstadoAtual() {
-        return estadoAtual;
-    }
-
-    public String getStatusNome() {
-        return estadoAtual.getNome();
     }
 
     // Métodos do Padrão Observer
@@ -60,16 +68,28 @@ public class Pedido {
         }
     }
 
-    // Getters para informações do pedido
-    public String getId() {
-        return id;
+    // Métodos do Padrão Strategy
+    public void setEstrategiaDeFrete(CalculoFreteStrategy estrategiaDeFrete) {
+        this.estrategiaDeFrete = estrategiaDeFrete;
     }
 
-    public String getClienteNome() {
-        return clienteNome;
+    public double calcularFrete(double distanciaKm) {
+        if (estrategiaDeFrete == null) {
+            throw new IllegalStateException("Estratégia de frete não foi definida.");
+        }
+        return estrategiaDeFrete.calcular(distanciaKm);
     }
 
-    public String getRestauranteNome() {
-        return restauranteNome;
+    // Getters para expor informações de forma segura
+    public String getId() { return id; }
+    public String getClienteNome() { return clienteNome; }
+    public String getRestauranteNome() { return restauranteNome; }
+    public String getStatusNome() { return estadoAtual.getNome(); }
+    public double getValorTotalItens() {
+        return itens.stream().mapToDouble(ItemCusto::getValor).sum();
+    }
+    public List<ItemCusto> getItens() {
+        return new ArrayList<>(itens); // Retorna uma cópia para proteger a lista original
     }
 }
+

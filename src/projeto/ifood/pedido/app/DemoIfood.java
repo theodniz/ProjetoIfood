@@ -1,62 +1,78 @@
-package projeto.ifood.pedido.app;
+package projeto.ifood.app;
+
+import projeto.ifood.pedido.frete.*;
+import projeto.ifood.pedido.item.*;
 import projeto.ifood.pedido.modelo.Pedido;
 import projeto.ifood.pedido.observador.ClienteNotificacao;
 import projeto.ifood.pedido.observador.RestauranteNotificacao;
 
 public class DemoIfood {
     public static void main(String[] args) {
-        System.out.println("--- Iniciando Simulação iFood ---");
+        System.out.println("--- Iniciando Simulação iFood com 5 Padrões de Projeto ---");
 
-        // Criando observadores
-        ClienteNotificacao clienteTheo = new ClienteNotificacao("Theo");
-        RestauranteNotificacao restauranteJavaLanches = new RestauranteNotificacao("Java Lanches");
+        // --- Cenário 1: Pedido de Pizza com Borda Recheada ---
+        System.out.println("\n--- Cenário 1: Pedido de Pizza ---");
 
-        // Cliente faz um pedido
-        System.out.println("\n--- Cliente Theo faz um pedido no Java Lanches ---");
-        Pedido pedido123 = new Pedido("123", "Theo", "Java Lanches");
+        // 1. (Decorator) Criando os itens e adicionando opcionais
+        System.out.println("1. Montando itens com Decorator...");
+        ItemCusto pizzaCalabresa = new ItemPedido("Pizza de Calabresa Grande", 45.00);
+        pizzaCalabresa = new BordaRecheadaDecorator(pizzaCalabresa); // Decorando com borda!
 
-        // Adicionando observadores ao pedido
-        pedido123.adicionarObservador(clienteTheo);
-        pedido123.adicionarObservador(restauranteJavaLanches);
+        ItemCusto refrigerante = new ItemPedido("Refrigerante 2L", 8.00);
 
-        // Restaurante visualiza o pedido pendente e o confirma (o estado inicial já notifica)
-        // (A notificação do estado "Pendente" ocorre na criação do Pedido, se setEstado for chamado no construtor ou se notificarmos após adicionar observadores)
-        // Para garantir que a primeira notificação "Pendente" seja enviada aos observadores já registrados:
-        pedido123.notificarObservadores(); // Notifica o estado Pendente inicial aos observadores registrados
+        // 2. (Builder) Montando o pedido de forma fluente e legível
+        System.out.println("\n2. Construindo o pedido com Builder...");
+        Pedido pedidoPizza = Pedido.builder("P001")
+                .paraCliente("Theo")
+                .noRestaurante("Pizzaria Dev")
+                .entregarEm("Rua da Programação, 101")
+                .comItem(pizzaCalabresa)
+                .comItem(refrigerante)
+                .build();
 
-        System.out.println("\n--- Restaurante confirma o pedido ---");
-        pedido123.avancarStatus(); // Pendente -> Confirmado
+        // 3. (Strategy) Definindo a política de frete dinamicamente
+        System.out.println("\n3. Calculando o frete com Strategy...");
+        double distanciaEmKm = 3.5;
+        CalculoFreteStrategy estrategiaFrete;
 
-        System.out.println("\n--- Restaurante inicia o preparo ---");
-        pedido123.avancarStatus(); // Confirmado -> Em Preparo
+        if (pedidoPizza.getValorTotalItens() > 50.00) {
+            estrategiaFrete = new FreteGratisStrategy();
+        } else {
+            estrategiaFrete = new FretePorKmStrategy();
+        }
+        pedidoPizza.setEstrategiaDeFrete(estrategiaFrete);
 
-        System.out.println("\n--- Pedido fica pronto para entrega ---");
-        pedido123.avancarStatus(); // Em Preparo -> Pronto para Entrega
+        // Calculando valores finais
+        double valorFrete = pedidoPizza.calcularFrete(distanciaEmKm);
+        double valorTotal = pedidoPizza.getValorTotalItens() + valorFrete;
 
-        System.out.println("\n--- Entregador retira o pedido ---");
-        pedido123.avancarStatus(); // Pronto para Entrega -> Em Trânsito
+        System.out.println("\n--- Resumo do Pedido " + pedidoPizza.getId() + " ---");
+        System.out.println("Itens do Pedido:");
+        pedidoPizza.getItens().forEach(item -> System.out.println(" - " + item.getDescricao() + ": R$" + String.format("%.2f", item.getValor())));
+        System.out.println("Valor dos Itens: R$" + String.format("%.2f", pedidoPizza.getValorTotalItens()));
+        System.out.println("Valor do Frete: R$" + String.format("%.2f", valorFrete));
+        System.out.println("VALOR TOTAL DO PEDIDO: R$" + String.format("%.2f", valorTotal));
+        System.out.println("---------------------------------");
 
-        System.out.println("\n--- Pedido é entregue ---");
-        pedido123.avancarStatus(); // Em Trânsito -> Entregue
 
-        System.out.println("\n--- Tentando avançar status de pedido entregue ---");
-        pedido123.avancarStatus(); // Não deve mudar
+        // 4. (Observer) Configurando quem será notificado sobre as mudanças
+        System.out.println("\n4. Configurando notificações com Observer...");
+        ClienteNotificacao obsCliente = new ClienteNotificacao("Theo");
+        RestauranteNotificacao obsRestaurante = new RestauranteNotificacao("Pizzaria Dev");
+        pedidoPizza.adicionarObservador(obsCliente);
+        pedidoPizza.adicionarObservador(obsRestaurante);
 
-        System.out.println("\n\n--- Simulação de um pedido cancelado ---");
-        Pedido pedido456 = new Pedido("456", "Ana", "Pizza Byte");
-        ClienteNotificacao clienteAna = new ClienteNotificacao("Ana");
-        RestauranteNotificacao restaurantePizzaByte = new RestauranteNotificacao("Pizza Byte");
+        // 5. (State) Gerenciando o ciclo de vida do pedido
+        System.out.println("\n5. Acompanhando o ciclo de vida com State...");
+        // O estado inicial "Pendente" é notificado agora:
+        pedidoPizza.notificarObservadores();
 
-        pedido456.adicionarObservador(clienteAna);
-        pedido456.adicionarObservador(restaurantePizzaByte);
-        pedido456.notificarObservadores(); // Notifica estado Pendente
+        pedidoPizza.avancarStatus(); // -> Confirmado
+        pedidoPizza.avancarStatus(); // -> Em Preparo
+        pedidoPizza.avancarStatus(); // -> Pronto para Entrega
+        pedidoPizza.avancarStatus(); // -> Em Trânsito
+        pedidoPizza.avancarStatus(); // -> Entregue
 
-        System.out.println("\n--- Cliente Ana cancela o pedido enquanto Pendente ---");
-        pedido456.cancelarPedido(); // Pendente -> Cancelado
-
-        System.out.println("\n--- Tentando avançar status de pedido cancelado ---");
-        pedido456.avancarStatus(); // Não deve mudar
-
-        System.out.println("\n--- Fim da Simulação iFood ---");
+        System.out.println("\n--- Fim da Simulação ---");
     }
 }
